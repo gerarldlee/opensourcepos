@@ -23,11 +23,8 @@ INSERT INTO `ospos_app_config` (`key`, `value`) VALUES
 ('return_policy', 'Test'),
 ('timezone', 'America/New_York'),
 ('website', ''),
-('recv_invoice_format', '$CO'),
-('sales_invoice_format', '$CO'),
-('tax_included', '0'),
-('invoice_default_comments', 'This is a default comment'),
 ('company_logo', ''),
+('tax_included', '0'),
 ('barcode_content', 'id'),
 ('barcode_type', 'Code39'),
 ('barcode_width', '250'),
@@ -43,8 +40,14 @@ INSERT INTO `ospos_app_config` (`key`, `value`) VALUES
 ('barcode_page_cellspacing', '20'),
 ('barcode_generate_if_empty', '0'),
 ('receipt_show_taxes', '0'),
-('use_invoice_template', '1'),
+('receipt_show_total_discount', '1'),
+('receipt_show_description', '1'),
+('receipt_show_serialnumber', '1'),
+('invoice_enable', '1'),
+('recv_invoice_format', '$CO'),
+('sales_invoice_format', '$CO'),
 ('invoice_email_message', 'Dear $CU, In attachment the receipt for sale $INV'),
+('invoice_default_comments', 'This is a default comment'),
 ('print_silently', '1'),
 ('print_header', '0'),
 ('print_footer', '0'),
@@ -54,10 +57,29 @@ INSERT INTO `ospos_app_config` (`key`, `value`) VALUES
 ('print_right_margin', '0'),
 ('default_sales_discount', '0'),
 ('lines_per_page', '25'),
-('show_total_discount', '1'),
 ('dateformat', 'm/d/Y'),
 ('timeformat', 'H:i:s'),
-('currency_symbol', '$');
+('currency_symbol', '$'),
+('number_locale', 'en_US'),
+('thousands_separator', '1'),
+('currency_decimals', '2'),
+('tax_decimals', '2'),
+('quantity_decimals', '0'),
+('country_codes', 'us'),
+('msg_msg', ''),
+('msg_uid', ''),
+('msg_src', ''),
+('msg_pwd', ''),
+('notify_horizontal_position', 'right'),
+('notify_vertical_position', 'top'),
+('payment_options_order', 'cashdebitcredit'),
+('protocol', 'mail'),
+('mailpath', '/usr/sbin/sendmail'),
+('smtp_port', '465'),
+('smtp_timeout', '5'),
+('smtp_crypto', 'ssl'),
+('receipt_template', 'receipt_default');
+
 
 -- --------------------------------------------------------
 
@@ -70,6 +92,7 @@ CREATE TABLE `ospos_customers` (
   `company_name` varchar(255) DEFAULT NULL,
   `account_number` varchar(255) DEFAULT NULL,
   `taxable` int(1) NOT NULL DEFAULT '1',
+  `discount_percent` decimal(15,2) NOT NULL DEFAULT '0',
   `deleted` int(1) NOT NULL DEFAULT '0',
   UNIQUE KEY `account_number` (`account_number`),
   KEY `person_id` (`person_id`)
@@ -138,7 +161,7 @@ CREATE TABLE `ospos_inventory` (
   `trans_date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `trans_comment` text NOT NULL,
   `trans_location` int(11) NOT NULL,
-  `trans_inventory` int(11) NOT NULL DEFAULT '0',
+  `trans_inventory` decimal(15,3) NOT NULL DEFAULT '0',
   PRIMARY KEY (`trans_id`),
   KEY `trans_items` (`trans_items`),
   KEY `trans_user` (`trans_user`),
@@ -164,8 +187,8 @@ CREATE TABLE `ospos_items` (
   `description` varchar(255) NOT NULL,
   `cost_price` decimal(15,2) NOT NULL,
   `unit_price` decimal(15,2) NOT NULL,
-  `reorder_level` decimal(15,2) NOT NULL DEFAULT '0',
-  `receiving_quantity` int(11) NOT NULL DEFAULT '1',
+  `reorder_level` decimal(15,3) NOT NULL DEFAULT '0',
+  `receiving_quantity` decimal(15,3) NOT NULL DEFAULT '1',
   `item_id` int(10) NOT NULL AUTO_INCREMENT,
   `pic_id` int(10) DEFAULT NULL,
   `allow_alt_description` tinyint(1) NOT NULL,
@@ -200,7 +223,7 @@ CREATE TABLE `ospos_items` (
 CREATE TABLE `ospos_items_taxes` (
   `item_id` int(10) NOT NULL,
   `name` varchar(255) NOT NULL,
-  `percent` decimal(15,2) NOT NULL,
+  `percent` decimal(15,3) NOT NULL,
   PRIMARY KEY (`item_id`,`name`,`percent`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -236,7 +259,7 @@ CREATE TABLE `ospos_item_kits` (
 CREATE TABLE `ospos_item_kit_items` (
   `item_kit_id` int(11) NOT NULL,
   `item_id` int(11) NOT NULL,
-  `quantity` decimal(15,2) NOT NULL,
+  `quantity` decimal(15,3) NOT NULL,
   PRIMARY KEY (`item_kit_id`,`item_id`,`quantity`),
   KEY `ospos_item_kit_items_ibfk_2` (`item_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -254,7 +277,7 @@ CREATE TABLE `ospos_item_kit_items` (
 CREATE TABLE IF NOT EXISTS `ospos_item_quantities` (
   `item_id` int(11) NOT NULL,
   `location_id` int(11) NOT NULL,
-  `quantity` int(11) NOT NULL DEFAULT '0',
+  `quantity` decimal(15,3) NOT NULL DEFAULT '0',
   PRIMARY KEY (`item_id`,`location_id`),
   KEY `item_id` (`item_id`),
   KEY `location_id` (`location_id`)
@@ -281,12 +304,13 @@ CREATE TABLE `ospos_modules` (
 --
 
 INSERT INTO `ospos_modules` (`name_lang_key`, `desc_lang_key`, `sort`, `module_id`) VALUES
-('module_config', 'module_config_desc', 100, 'config'),
+('module_config', 'module_config_desc', 110, 'config'),
 ('module_customers', 'module_customers_desc', 10, 'customers'),
 ('module_employees', 'module_employees_desc', 80, 'employees'),
 ('module_giftcards', 'module_giftcards_desc', 90, 'giftcards'),
 ('module_items', 'module_items_desc', 20, 'items'),
 ('module_item_kits', 'module_item_kits_desc', 30, 'item_kits'),
+('module_messages', 'module_messages_desc', 100, 'messages'),
 ('module_receivings', 'module_receivings_desc', 60, 'receivings'),
 ('module_reports', 'module_reports_desc', 50, 'reports'),
 ('module_sales', 'module_sales_desc', 70, 'sales'),
@@ -357,6 +381,7 @@ INSERT INTO `ospos_permissions` (`permission_id`, `module_id`) VALUES
 ('giftcards', 'giftcards'),
 ('items', 'items'),
 ('item_kits', 'item_kits'),
+('messages', 'messages'),
 ('receivings', 'receivings'),
 ('reports', 'reports'),
 ('sales', 'sales'),
@@ -402,6 +427,7 @@ INSERT INTO `ospos_grants` (`permission_id`, `person_id`) VALUES
 ('giftcards', 1),
 ('items', 1),
 ('item_kits', 1),
+('messages', 1),
 ('receivings', 1),
 ('reports', 1),
 ('sales', 1),
@@ -422,11 +448,11 @@ CREATE TABLE `ospos_receivings` (
   `comment` text NOT NULL,
   `receiving_id` int(10) NOT NULL AUTO_INCREMENT,
   `payment_type` varchar(20) DEFAULT NULL,
-  `invoice_number` varchar(32) DEFAULT NULL,
+  `reference` varchar(32) DEFAULT NULL,
   PRIMARY KEY (`receiving_id`),
   KEY `supplier_id` (`supplier_id`),
   KEY `employee_id` (`employee_id`),
-  UNIQUE KEY `invoice_number` (`invoice_number`)
+  KEY `reference` (`reference`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8  ;
 
 --
@@ -446,12 +472,12 @@ CREATE TABLE `ospos_receivings_items` (
   `description` varchar(30) DEFAULT NULL,
   `serialnumber` varchar(30) DEFAULT NULL,
   `line` int(3) NOT NULL,
-  `quantity_purchased` decimal(15,2) NOT NULL DEFAULT '0',
+  `quantity_purchased` decimal(15,3) NOT NULL DEFAULT '0',
   `item_cost_price` decimal(15,2) NOT NULL,
   `item_unit_price` decimal(15,2) NOT NULL,
   `discount_percent` decimal(15,2) NOT NULL DEFAULT '0',
   `item_location` int(11) NOT NULL,
-  `receiving_quantity` int(11) NOT NULL DEFAULT '1',
+  `receiving_quantity` decimal(15,3) NOT NULL DEFAULT '1',
   PRIMARY KEY (`receiving_id`,`item_id`,`line`),
   KEY `item_id` (`item_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -498,7 +524,7 @@ CREATE TABLE `ospos_sales_items` (
   `description` varchar(30) DEFAULT NULL,
   `serialnumber` varchar(30) DEFAULT NULL,
   `line` int(3) NOT NULL DEFAULT '0',
-  `quantity_purchased` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `quantity_purchased` decimal(15,3) NOT NULL DEFAULT '0',
   `item_cost_price` decimal(15,2) NOT NULL,
   `item_unit_price` decimal(15,2) NOT NULL,
   `discount_percent` decimal(15,2) NOT NULL DEFAULT '0',
@@ -525,7 +551,7 @@ CREATE TABLE `ospos_sales_items_taxes` (
   `item_id` int(10) NOT NULL,
   `line` int(3) NOT NULL DEFAULT '0',
   `name` varchar(255) NOT NULL,
-  `percent` decimal(15,2) NOT NULL,
+  `percent` decimal(15,3) NOT NULL,
   PRIMARY KEY (`sale_id`,`item_id`,`line`,`name`,`percent`),
   KEY `sale_id` (`sale_id`),
   KEY `item_id` (`item_id`)
@@ -590,7 +616,7 @@ CREATE TABLE `ospos_sales_suspended_items` (
   `description` varchar(30) DEFAULT NULL,
   `serialnumber` varchar(30) DEFAULT NULL,
   `line` int(3) NOT NULL DEFAULT '0',
-  `quantity_purchased` decimal(15,2) NOT NULL DEFAULT '0.00',
+  `quantity_purchased` decimal(15,3) NOT NULL DEFAULT '0',
   `item_cost_price` decimal(15,2) NOT NULL,
   `item_unit_price` decimal(15,2) NOT NULL,
   `discount_percent` decimal(15,2) NOT NULL DEFAULT '0',
@@ -616,7 +642,7 @@ CREATE TABLE `ospos_sales_suspended_items_taxes` (
   `item_id` int(10) NOT NULL,
   `line` int(3) NOT NULL DEFAULT '0',
   `name` varchar(255) NOT NULL,
-  `percent` decimal(15,2) NOT NULL,
+  `percent` decimal(15,3) NOT NULL,
   PRIMARY KEY (`sale_id`,`item_id`,`line`,`name`,`percent`),
   KEY `item_id` (`item_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
@@ -651,12 +677,11 @@ CREATE TABLE `ospos_sales_suspended_payments` (
 --
 
 CREATE TABLE `ospos_sessions` (
-  `session_id` varchar(40) NOT NULL DEFAULT '0',
-  `ip_address` varchar(45) NOT NULL DEFAULT '0',
-  `user_agent` varchar(120) NOT NULL,
-  `last_activity` int(10) unsigned NOT NULL DEFAULT '0',
-  `user_data` text,
-  PRIMARY KEY (`session_id`)
+  `id` varchar(40) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `timestamp` int(10) unsigned DEFAULT 0 NOT NULL,
+  `data` blob NOT NULL,
+  KEY `ci_sessions_timestamp` (`timestamp`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 --
@@ -701,5 +726,4 @@ CREATE TABLE `ospos_suppliers` (
 --
 -- Dumping data for table `ospos_suppliers`
 --
-
 

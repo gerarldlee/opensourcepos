@@ -1,4 +1,4 @@
-<?php
+<?php if (!defined('BASEPATH')) exit('No direct script access allowed');
 
 use emberlabs\Barcode\BarcodeBase;
 require APPPATH.'/views/barcodes/BarcodeBase.php';
@@ -9,10 +9,10 @@ require APPPATH.'/views/barcodes/Ean8.php';
 
 class Barcode_lib
 {
-	private $CI = null;
+	private $CI;
 	private $supported_barcodes = array('Code39' => 'Code 39', 'Code128' => 'Code 128', 'Ean8' => 'EAN 8', 'Ean13' => 'EAN 13');
 	
-	function __construct()
+	public function __construct()
 	{
 		$this->CI =& get_instance();
 	}
@@ -91,7 +91,7 @@ class Barcode_lib
 
 	private static function barcode_seed($item, $barcode_instance, $barcode_config)
 	{
-		$seed = $barcode_config['barcode_content'] !== "id" && isset($item['item_number']) ? $item['item_number'] : $item['item_id'];
+		$seed = $barcode_config['barcode_content'] !== "id" && !empty($item['item_number']) ? $item['item_number'] : $item['item_id'];
 
 		if( $barcode_config['barcode_content'] !== "id" && !empty($item['item_number']))
 		{
@@ -178,28 +178,28 @@ class Barcode_lib
 		{
 			$result = $this->CI->lang->line('items_name') . " " . $item['name'];
 		}
-		else if($layout_type == 'category' && isset($item['category']))
+		elseif($layout_type == 'category' && isset($item['category']))
 		{
 			$result = $this->CI->lang->line('items_category') . " " . $item['category'];
 		}
-		else if($layout_type == 'cost_price' && isset($item['cost_price']))
+		elseif($layout_type == 'cost_price' && isset($item['cost_price']))
 		{
 			$result = $this->CI->lang->line('items_cost_price') . " " . to_currency($item['cost_price']);
 		}
-		else if($layout_type == 'unit_price' && isset($item['unit_price']))
+		elseif($layout_type == 'unit_price' && isset($item['unit_price']))
 		{
 			$result = $this->CI->lang->line('items_unit_price') . " " . to_currency($item['unit_price']);
 		}
-		else if($layout_type == 'company_name')
+		elseif($layout_type == 'company_name')
 		{
 			$result = $barcode_config['company'];
 		}
-		else if($layout_type == 'item_code')
+		elseif($layout_type == 'item_code')
 		{
 			$result = $barcode_config['barcode_content'] !== "id" && isset($item['item_number']) ? $item['item_number'] : $item['item_id'];
 		}
 
-		return $result;
+		return character_limiter($result, 40);
 	}
 	
 	public function listfonts($folder) 
@@ -219,7 +219,7 @@ class Barcode_lib
 
 		closedir($handle);
 
-		array_unshift($array, 'No Label');
+		array_unshift($array, $this->CI->lang->line('config_none'));
 
 		return $array;
 	}
@@ -229,4 +229,5 @@ class Barcode_lib
 		return substr($font_file_name, 0, -4);
 	}
 }
+
 ?>

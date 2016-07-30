@@ -1,17 +1,21 @@
-FROM jbfink/docker-lampstack
+FROM php:5-apache
 MAINTAINER jekkos
-# Install dependencies 
-RUN apt-get install -y --no-install-recommends software-properties-common
-RUN apt-get install -y python git
-RUN apt-get update
-# RUN add-apt-repository ppa:chris-lea/node.js
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    php5-apcu \
+    libicu-dev \
+    libgd-dev
 
-# Get latest Ospos source from Git
-RUN git clone https://github.com/jekkos/opensourcepos.git /app
-# RUN cd app && npm install
+RUN a2enmod rewrite
+RUN docker-php-ext-install mysql mysqli bcmath intl gd
+RUN echo "date.timezone = \"UTC\"" > /usr/local/etc/php/conf.d/timezone.ini
 
-RUN ln -fs /app/* /var/www
-ADD ./start_container.sh /start_container.sh
-RUN chmod 755 /start_container.sh
-EXPOSE 80 3306
-CMD ["/bin/bash", "/start_container.sh"]
+WORKDIR /app
+COPY . /app
+RUN ln -s /app/* /var/www/html
+
+RUN cp application/config/database.php.tmpl application/config/database.php && \
+    sed -i -e "s/\(localhost\)/web/g" test/ospos.js && \
+    sed -i -e "s/\(user.*\?=.\).*\(.\)$/\1getenv('MYSQL_USERNAME')\2/g" application/config/database.php && \
+    sed -i -e "s/\(password.*\?=.\).*\(.\)$/\1getenv('MYSQL_PASSWORD')\2/g" application/config/database.php && \
+    sed -i -e "s/\(database.*\?=.\).*\(.\)$/\1getenv('MYSQL_DB_NAME')\2/g" application/config/database.php && \
+    sed -i -e "s/\(hostname.*\?=.\).*\(.\)$/\1getenv('MYSQL_HOST_NAME')\2/g" application/config/database.php
